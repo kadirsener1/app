@@ -45,7 +45,7 @@ function initControls() {
 		'ChannelDown': 34,		// Page Down
 		'PreviousChannel': 8,	// Back
 		'ChannelList': 2,
-		'MediaPlay': 1016,		// Space
+
 		'MediaStop': 2,
 		'MediaPause': 2,
 
@@ -68,7 +68,7 @@ function initControls() {
 		aButtons['ChannelDown'] = 1012;
 		aButtons['PreviousChannel'] = 1017;
 		aButtons['ChannelList'] = 1013;
-		aButtons['MediaPlay'] = 1016;
+
 		aButtons['MediaStop'] = 1015;
 		aButtons['MediaPause'] = 1016;
 
