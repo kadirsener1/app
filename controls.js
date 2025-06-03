@@ -45,7 +45,7 @@ function initControls() {
 		'ChannelDown': 34,		// Page Down
 		'PreviousChannel': 8,	// Back
 		'ChannelList': 2,
-		'MediaPlay': 32,		// Space
+		'MediaPlay': 39,		// Space
 		'MediaStop': 2,
 		'MediaPause': 2,
 
