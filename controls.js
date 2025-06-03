@@ -68,7 +68,7 @@ function initControls() {
 		aButtons['ChannelDown'] = 1012;
 		aButtons['PreviousChannel'] = 1017;
 		aButtons['ChannelList'] = 1013;
-		aButtons['MediaPlay'] = 1014;
+		aButtons['MediaPlay'] = 1013;
 		aButtons['MediaStop'] = 1015;
 		aButtons['MediaPause'] = 1016;
 
