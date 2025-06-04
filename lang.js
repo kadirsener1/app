@@ -719,13 +719,13 @@ var i18n = {
 
 	// Menu
 	'searchPlaceholder': 'Arama',
-	'allChannels': 'Tüm kanallar',
-	'favourites': 'â­ Favoriler',
+	'allChannels': 'Tum kanallar',
+	'favourites': 'Favoriler',
 	'groups': 'Gruplar',
 	'channels': 'Kanallar',
 	'settings_menu': 'Ayarlar',
 	'epg_menu': 'EPG',
-	'guide_menu': 'KÄ±lavuz',
+	'guide_menu': 'Kilavuz',
 
 	'guideControlsHeadline': 'Kontroller',
 
