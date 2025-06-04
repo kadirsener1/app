@@ -672,7 +672,7 @@ var i18n = {
 
 },
 'tr': {
-	'yes': 'evet', 'no': 'hayır',
+	'yes': 'evet', 'no': 'hayÄ±r',
 
 	'm3uSource': 'm3u(8)-dosyasÄ±nÄ±n URL\'si',
 	'chooseLang': 'Dil',
@@ -718,14 +718,14 @@ var i18n = {
 	'errorNoPlaylistHistory': 'HenÃ¼z geÃ§miÅŸte oynatma listesi yok. LÃ¼tfen aÅŸaÄŸÄ±daki alana bir URL girin.',
 
 	// Menu
-	'searchPlaceholder': 'Arama',
-	'allChannels': 'Tüm kanallar',
-	'favourites': 'Favoriler',
+	'searchPlaceholder': 'AraÅŸtÄ±rma',
+	'allChannels': 'TÃ¼m kanallar',
+	'favourites': 'â­ Favoriler',
 	'groups': 'Gruplar',
 	'channels': 'Kanallar',
 	'settings_menu': 'Ayarlar',
 	'epg_menu': 'EPG',
-	'guide_menu': 'Kılavuz',
+	'guide_menu': 'KÄ±lavuz',
 
 	'guideControlsHeadline': 'Kontroller',
 
