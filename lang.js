@@ -718,8 +718,8 @@ var i18n = {
 	'errorNoPlaylistHistory': 'HenÃ¼z geÃ§miÅŸte oynatma listesi yok. LÃ¼tfen aÅŸaÄŸÄ±daki alana bir URL girin.',
 
 	// Menu
-	'searchPlaceholder': 'AraÅŸtÄ±rma',
-	'allChannels': 'TÃ¼m kanallar',
+	'searchPlaceholder': 'Arama',
+	'allChannels': 'Tüm kanallar',
 	'favourites': 'â­ Favoriler',
 	'groups': 'Gruplar',
 	'channels': 'Kanallar',
