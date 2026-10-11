@@ -336,6 +336,7 @@ class ChannelStream:
         self.started_at = 0.0
         self.enabled = channel.get("enabled", True)
         self.viewers = {}
+        self.last_sched_state = None  # Geçiş durum takipçisi
 
     def record_viewer(self, ip: str):
         if ip and ip != "unknown":
@@ -476,19 +477,42 @@ class StreamManager:
             now = time.time()
             for cid, st in self.streams.items():
                 sched_state = check_schedule(st)
+                
+                # Sadece takvim durum geçişlerinde (Açılış/Kapanış saatinde) müdahale eder.
                 if sched_state is not None:
-                    if sched_state and not st.enabled:
-                        st.enabled = True
-                        st.ch["enabled"] = True
-                        st.touch()
-                        await st.start()
-                        log.info(f"[Zamanlayıcı] {cid} yayını otomatik olarak BAŞLATILDI.")
-                    elif not sched_state and st.enabled:
-                        st.enabled = False
-                        st.ch["enabled"] = False
-                        await st.stop()
-                        log.info(f"[Zamanlayıcı] {cid} yayını otomatik olarak DURDURULDU.")
+                    if st.last_sched_state is not None:
+                        if sched_state != st.last_sched_state:
+                            st.enabled = sched_state
+                            st.ch["enabled"] = sched_state
+                            if sched_state:
+                                st.touch()
+                                await st.start()
+                                log.info(f"[Zamanlayıcı] {cid} yayını takvim geçişiyle otomatik olarak BAŞLATILDI.")
+                            else:
+                                await st.stop()
+                                log.info(f"[Zamanlayıcı] {cid} yayını takvim geçişiyle otomatik olarak DURDURULDU.")
+                            
+                            # Durum değişimini diske kaydet
+                            try:
+                                channels_data = [s.ch for s in self.streams.values()]
+                                with open(LOCAL_JSON_PATH, "w", encoding="utf-8") as f:
+                                    json.dump(channels_data, f, indent=2, ensure_ascii=False)
+                            except Exception:
+                                pass
+                    else:
+                        # İlk başlama anında takvimi eşitle
+                        st.enabled = sched_state
+                        st.ch["enabled"] = sched_state
+                        if sched_state and not st.is_alive():
+                            await st.start()
+                        elif not sched_state and st.is_alive():
+                            await st.stop()
+                    
+                    st.last_sched_state = sched_state
+                else:
+                    st.last_sched_state = None
 
+                # Genel boşta kalma ve durum kontrolleri
                 if not st.enabled and st.is_alive():
                     await st.stop()
                 elif st.is_alive() and st.last_request and (now - st.last_request) > IDLE_TIMEOUT:
@@ -610,10 +634,8 @@ async def handle_health(request):
         "channels": {}
     }
     for cid, st in manager.streams.items():
-        # Çoklu slot verisi (geriye dönük uyumlu)
         slots = st.ch.get("sched_slots", [])
         if not slots:
-            # Eski tek slot verisini çoklu formata dönüştür
             slots = [{
                 "start": st.ch.get("sched_start", "00:00"),
                 "end": st.ch.get("sched_end", "00:00")
@@ -936,21 +958,6 @@ ADMIN_HTML = """
                         btnToggle.className = `btn btn-toggle-action ${info.enabled ? 'btn-off' : 'btn-on'}`;
                         btnToggle.innerText = info.enabled ? 'YAYINI KAPAT' : 'YAYINI AÇ';
                         btnToggle.setAttribute('onclick', `toggleChannel('${id}', ${!info.enabled})`);
-
-                        // Form odaklanmışken verilerin sıfırlanmasını engelleyen senkronizasyon düzeltmesi
-                        const schedCheckbox = document.getElementById(`sched_enable_${id}`);
-                        if (schedCheckbox) {
-                            const isFocused = document.activeElement && (
-                                document.activeElement.id === `sched_enable_${id}` || 
-                                document.activeElement.classList.contains(`sched-input-${id}`) || 
-                                document.activeElement.classList.contains(`sched-slot-start-${id}`) || 
-                                document.activeElement.classList.contains(`sched-slot-end-${id}`)
-                            );
-                            if (!isFocused) {
-                                schedCheckbox.checked = info.sched_enabled;
-                                toggleScheduleUI(id);
-                            }
-                        }
                     }
                 }
             } catch(e) {}
@@ -1098,9 +1105,6 @@ async def handle_admin_toggle(request):
     st.enabled = enable
     st.ch["enabled"] = enable
 
-    # Kullanıcı manuel müdahale yaptığında, zamanlayıcının yayını hemen geri kapatmasını önlemek için zamanlayıcıyı devreden çıkarıyoruz
-    st.ch["sched_enabled"] = False
-
     try:
         channels_data = [s.ch for s in manager.streams.values()]
         with open(LOCAL_JSON_PATH, "w", encoding="utf-8") as f:
@@ -1208,6 +1212,9 @@ async def handle_admin_update_schedule(request):
     if slots_list:
         st.ch["sched_start"] = slots_list[0]["start"]
         st.ch["sched_end"] = slots_list[0]["end"]
+
+    # Zamanlayıcı değiştiğinde durum takipçisini sıfırla ki takvimi hemen eşitlesin
+    st.last_sched_state = None
 
     try:
         channels_data = [s.ch for s in manager.streams.values()]
