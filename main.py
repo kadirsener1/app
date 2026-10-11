@@ -175,20 +175,6 @@ DEFAULT_KANALLAR = [
         "group": "Spor",
         "logo": "https://raw.githubusercontent.com/kadirsener1/tvmyeni/refs/heads/main/bg.JPG",
         "url": os.environ.get("URL_FUTBOL_TV", "http://varsayilan-yayin-adresi.m3u8")
-    },
-    {
-        "id": "sportv_yedek",
-        "name": "YDK",
-        "group": "Spor",
-        "logo": "https://raw.githubusercontent.com/kadirsener1/tvmyeni/refs/heads/main/bg.JPG",
-        "url": os.environ.get("URL_YDK", "http://varsayilan-yayin-adresi.m3u8")
-    },
-    {
-        "id": "bein_sports_1_6817",
-        "name": "BEİN SPORTS 1 (6817)",
-        "group": "Spor",
-        "logo": "https://raw.githubusercontent.com/kadirsener1/tvmyeni/refs/heads/main/bg.JPG",
-        "url": os.environ.get("URL_BEIN_6817", "http://varsayilan-yayin-adresi.m3u8")
     }
 ]
 
