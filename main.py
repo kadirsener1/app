@@ -294,10 +294,6 @@ def check_schedule(st) -> bool | None:
     now = datetime.datetime.now()
     day_of_week = now.weekday()
     sched_days = st.ch.get("sched_days", [])
-    try:
-        sched_days = [int(d) for d in sched_days]
-    except Exception:
-        sched_days = []
 
     if day_of_week not in sched_days:
         return False
@@ -336,7 +332,6 @@ class ChannelStream:
         self.started_at = 0.0
         self.enabled = channel.get("enabled", True)
         self.viewers = {}
-        self.last_sched_state = None  # Geçiş durum takipçisi
 
     def record_viewer(self, ip: str):
         if ip and ip != "unknown":
@@ -477,42 +472,17 @@ class StreamManager:
             now = time.time()
             for cid, st in self.streams.items():
                 sched_state = check_schedule(st)
-                
-                # Sadece takvim durum geçişlerinde (Açılış/Kapanış saatinde) müdahale eder.
                 if sched_state is not None:
-                    if st.last_sched_state is not None:
-                        if sched_state != st.last_sched_state:
-                            st.enabled = sched_state
-                            st.ch["enabled"] = sched_state
-                            if sched_state:
-                                st.touch()
-                                await st.start()
-                                log.info(f"[Zamanlayıcı] {cid} yayını takvim geçişiyle otomatik olarak BAŞLATILDI.")
-                            else:
-                                await st.stop()
-                                log.info(f"[Zamanlayıcı] {cid} yayını takvim geçişiyle otomatik olarak DURDURULDU.")
-                            
-                            # Durum değişimini diske kaydet
-                            try:
-                                channels_data = [s.ch for s in self.streams.values()]
-                                with open(LOCAL_JSON_PATH, "w", encoding="utf-8") as f:
-                                    json.dump(channels_data, f, indent=2, ensure_ascii=False)
-                            except Exception:
-                                pass
-                    else:
-                        # İlk başlama anında takvimi eşitle
-                        st.enabled = sched_state
-                        st.ch["enabled"] = sched_state
-                        if sched_state and not st.is_alive():
-                            await st.start()
-                        elif not sched_state and st.is_alive():
-                            await st.stop()
-                    
-                    st.last_sched_state = sched_state
-                else:
-                    st.last_sched_state = None
+                    if sched_state and not st.enabled:
+                        st.enabled = True
+                        st.touch()
+                        await st.start()
+                        log.info(f"[Zamanlayıcı] {cid} yayını otomatik olarak BAŞLATILDI.")
+                    elif not sched_state and st.enabled:
+                        st.enabled = False
+                        await st.stop()
+                        log.info(f"[Zamanlayıcı] {cid} yayını otomatik olarak DURDURULDU.")
 
-                # Genel boşta kalma ve durum kontrolleri
                 if not st.enabled and st.is_alive():
                     await st.stop()
                 elif st.is_alive() and st.last_request and (now - st.last_request) > IDLE_TIMEOUT:
@@ -634,8 +604,10 @@ async def handle_health(request):
         "channels": {}
     }
     for cid, st in manager.streams.items():
+        # Çoklu slot verisi (geriye dönük uyumlu)
         slots = st.ch.get("sched_slots", [])
         if not slots:
+            # Eski tek slot verisini çoklu formata dönüştür
             slots = [{
                 "start": st.ch.get("sched_start", "00:00"),
                 "end": st.ch.get("sched_end", "00:00")
@@ -1212,9 +1184,6 @@ async def handle_admin_update_schedule(request):
     if slots_list:
         st.ch["sched_start"] = slots_list[0]["start"]
         st.ch["sched_end"] = slots_list[0]["end"]
-
-    # Zamanlayıcı değiştiğinde durum takipçisini sıfırla ki takvimi hemen eşitlesin
-    st.last_sched_state = None
 
     try:
         channels_data = [s.ch for s in manager.streams.values()]
