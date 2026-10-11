@@ -271,6 +271,22 @@ def generate_standby_clip(force=False):
 
 
 # ==================== OTO-ZAMANLAYICI KONTROLÜ ====================
+def _slot_contains(now_minutes: int, start_str: str, end_str: str) -> bool:
+    """Belirtilen slot içinde olup olmadığını kontrol eder (gece aşımı destekli)."""
+    try:
+        sh, sm = map(int, start_str.split(":"))
+        eh, em = map(int, end_str.split(":"))
+        start_minutes = sh * 60 + sm
+        end_minutes = eh * 60 + em
+        if start_minutes == end_minutes:
+            return False
+        if start_minutes <= end_minutes:
+            return start_minutes <= now_minutes < end_minutes
+        else:
+            return now_minutes >= start_minutes or now_minutes < end_minutes
+    except Exception:
+        return False
+
 def check_schedule(st) -> bool | None:
     if not st.ch.get("sched_enabled", False):
         return None
@@ -282,22 +298,25 @@ def check_schedule(st) -> bool | None:
     if day_of_week not in sched_days:
         return False
 
+    now_minutes = now.hour * 60 + now.minute
+
+    # Yeni çoklu slot sistemi
+    slots = st.ch.get("sched_slots", [])
+    if slots:
+        for slot in slots:
+            try:
+                start_str = slot.get("start", "00:00")
+                end_str = slot.get("end", "00:00")
+                if _slot_contains(now_minutes, start_str, end_str):
+                    return True
+            except Exception:
+                continue
+        return False
+
+    # Geriye dönük uyumluluk: Eski tek slot sistemi
     start_str = st.ch.get("sched_start", "00:00")
     end_str = st.ch.get("sched_end", "00:00")
-
-    try:
-        sh, sm = map(int, start_str.split(":"))
-        eh, em = map(int, end_str.split(":"))
-        now_minutes = now.hour * 60 + now.minute
-        start_minutes = sh * 60 + sm
-        end_minutes = eh * 60 + em
-
-        if start_minutes <= end_minutes:
-            return start_minutes <= now_minutes < end_minutes
-        else:
-            return now_minutes >= start_minutes or now_minutes < end_minutes
-    except Exception:
-        return False
+    return _slot_contains(now_minutes, start_str, end_str)
 
 
 # ==================== FFMPEG YÖNETİCİSİ ====================
@@ -585,6 +604,15 @@ async def handle_health(request):
         "channels": {}
     }
     for cid, st in manager.streams.items():
+        # Çoklu slot verisi (geriye dönük uyumlu)
+        slots = st.ch.get("sched_slots", [])
+        if not slots:
+            # Eski tek slot verisini çoklu formata dönüştür
+            slots = [{
+                "start": st.ch.get("sched_start", "00:00"),
+                "end": st.ch.get("sched_end", "00:00")
+            }]
+
         status["channels"][cid] = {
             "name": st.ch.get("name", cid), 
             "url": st.src if is_admin else "YAYIN LINKI GIZLENMISTIR",
@@ -594,6 +622,7 @@ async def handle_health(request):
             "viewers": st.get_viewer_count(),
             "sched_enabled": st.ch.get("sched_enabled", False),
             "sched_days": st.ch.get("sched_days", []),
+            "sched_slots": slots,
             "sched_start": st.ch.get("sched_start", "00:00"),
             "sched_end": st.ch.get("sched_end", "00:00")
         }
@@ -645,6 +674,10 @@ ADMIN_HTML = """
         .days-container { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; margin-bottom: 8px; }
         .days-container label { font-size: 11px; background: #334155; padding: 4px 6px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 2px; }
         .days-container input { margin: 0; }
+        
+        .slot-row { display:flex; gap:6px; margin-bottom:6px; align-items:center; background:#1e293b; padding:6px; border-radius:6px; }
+        .btn-remove-slot { background: #dc2626; padding: 6px 10px; font-size: 14px; border-radius: 6px; }
+        .btn-add-slot { background: #8b5cf6; width: 100%; padding: 8px; margin-bottom: 10px; font-size: 12px; }
     </style>
 </head>
 <body>
@@ -759,6 +792,26 @@ ADMIN_HTML = """
             updateInterval = setInterval(loadStatus, 3000);
         }
 
+        function addSlotRow(id, start, end) {
+            const container = document.getElementById(`sched_slots_container_${id}`);
+            if (!container) return;
+            const rowId = `slot_${id}_${Date.now()}_${Math.floor(Math.random()*10000)}`;
+            const div = document.createElement('div');
+            div.id = rowId;
+            div.className = 'slot-row';
+            div.innerHTML = `
+                <div style="flex:1;">
+                    <input type="time" class="edit-input sched-slot-start-${id}" value="${start || '00:00'}" style="width:100%;">
+                </div>
+                <span style="color:#94a3b8; font-weight:bold;">→</span>
+                <div style="flex:1;">
+                    <input type="time" class="edit-input sched-slot-end-${id}" value="${end || '00:00'}" style="width:100%;">
+                </div>
+                <button class="btn btn-remove-slot" onclick="document.getElementById('${rowId}').remove()">✕</button>
+            `;
+            container.appendChild(div);
+        }
+
         async function loadStatus() {
             try {
                 const key = getStoredKey();
@@ -836,28 +889,28 @@ ADMIN_HTML = """
                                         <label><input type="checkbox" class="sched-day-${id}" value="5"> Cmt</label>
                                         <label><input type="checkbox" class="sched-day-${id}" value="6"> Paz</label>
                                     </div>
-                                    <div style="display:flex; gap:10px; margin-bottom:10px;">
-                                        <div style="flex:1;">
-                                            <span style="font-size:11px; color:#94a3b8;">Açılış Saati:</span>
-                                            <input type="time" id="sched_start_${id}" class="edit-input sched-input-${id}" style="width:100%; margin-top:3px;">
-                                        </div>
-                                        <div style="flex:1;">
-                                            <span style="font-size:11px; color:#94a3b8;">Kapanış Saati:</span>
-                                            <input type="time" id="sched_end_${id}" class="edit-input sched-input-${id}" style="width:100%; margin-top:3px;">
-                                        </div>
-                                    </div>
+                                    
+                                    <span style="font-size:11px; color:#94a3b8; display:block; margin-bottom:6px;">Zaman Aralıkları (Günde Birden Fazla Eklenebilir):</span>
+                                    <div id="sched_slots_container_${id}"></div>
+                                    <button class="btn btn-add-slot" onclick="addSlotRow('${id}')">+ Zaman Aralığı Ekle</button>
+                                    
                                     <button class="btn btn-save" style="background:#059669; width:100%;" onclick="saveSchedule('${id}')">Zamanlayıcı Ayarlarını Kaydet</button>
                                 </div>
                             </div>
                         `;
 
                         document.getElementById(`sched_enable_${id}`).checked = info.sched_enabled;
-                        document.getElementById(`sched_start_${id}`).value = info.sched_start;
-                        document.getElementById(`sched_end_${id}`).value = info.sched_end;
                         info.sched_days.forEach(d => {
                             const cb = card.querySelector(`.sched-day-${id}[value="${d}"]`);
                             if (cb) cb.checked = true;
                         });
+                        
+                        // Mevcut slot'ları yükle
+                        const slots = (info.sched_slots && info.sched_slots.length > 0) 
+                            ? info.sched_slots 
+                            : [{start: info.sched_start || '00:00', end: info.sched_end || '00:00'}];
+                        slots.forEach(slot => addSlotRow(id, slot.start, slot.end));
+                        
                         toggleScheduleUI(id);
                     } else {
                         card.querySelector('.channel-title').innerText = info.name || id;
@@ -890,16 +943,30 @@ ADMIN_HTML = """
         async function saveSchedule(id) {
             const key = getStoredKey();
             const enabled = document.getElementById(`sched_enable_${id}`).checked;
-            const start = document.getElementById(`sched_start_${id}`).value;
-            const end = document.getElementById(`sched_end_${id}`).value;
             
             const days = [];
             document.querySelectorAll(`.sched-day-${id}:checked`).forEach(cb => {
                 days.push(cb.value);
             });
 
+            // Çoklu slot verilerini topla
+            const starts = document.querySelectorAll(`.sched-slot-start-${id}`);
+            const ends = document.querySelectorAll(`.sched-slot-end-${id}`);
+            const slots = [];
+            for (let i = 0; i < starts.length; i++) {
+                const s = starts[i].value || "00:00";
+                const e = ends[i].value || "00:00";
+                slots.push({start: s, end: e});
+            }
+
+            if (slots.length === 0) {
+                showToast('⚠ En az bir zaman aralığı eklemelisiniz!', '#dc2626');
+                return;
+            }
+
             try {
-                const res = await fetch(`/admin/update_schedule?key=${encodeURIComponent(key)}&id=${encodeURIComponent(id)}&enabled=${enabled}&days=${days.join(",")}&start=${start}&end=${end}&_=${Date.now()}`, { cache: 'no-store' });
+                const slotsJson = JSON.stringify(slots);
+                const res = await fetch(`/admin/update_schedule?key=${encodeURIComponent(key)}&id=${encodeURIComponent(id)}&enabled=${enabled}&days=${days.join(",")}&slots=${encodeURIComponent(slotsJson)}&_=${Date.now()}`, { cache: 'no-store' });
                 if (res.ok) {
                     showToast('✅ Zamanlayıcı ayarları başarıyla kaydedildi!');
                     setTimeout(loadStatus, 500);
@@ -1072,8 +1139,11 @@ async def handle_admin_update_schedule(request):
     cid = request.query.get("id")
     enabled = request.query.get("enabled") == "true"
     days_str = request.query.get("days", "")
-    start = request.query.get("start", "00:00")
-    end = request.query.get("end", "00:00")
+    slots_str = request.query.get("slots", "")  # JSON string (çoklu slot)
+    
+    # Geriye dönük uyumluluk için eski parametreler
+    start = request.query.get("start", "")
+    end = request.query.get("end", "")
 
     if key != ADMIN_KEY:
         return web.Response(status=401, text="Yetkisiz Erişim")
@@ -1087,16 +1157,39 @@ async def handle_admin_update_schedule(request):
     except ValueError:
         days_list = []
 
+    # Çoklu slot verisini parse et
+    slots_list = []
+    if slots_str:
+        try:
+            parsed = json.loads(slots_str)
+            if isinstance(parsed, list):
+                for s in parsed:
+                    if isinstance(s, dict):
+                        slot_start = s.get("start", "00:00") or "00:00"
+                        slot_end = s.get("end", "00:00") or "00:00"
+                        slots_list.append({"start": slot_start, "end": slot_end})
+        except Exception as e:
+            log.warning(f"Slot parse hatası: {e}")
+            slots_list = []
+
+    # Eğer slots gelmediyse ve eski start/end gönderilmişse geriye dönük uyumluluk
+    if not slots_list and start and end:
+        slots_list = [{"start": start, "end": end}]
+
     st.ch["sched_enabled"] = enabled
     st.ch["sched_days"] = days_list
-    st.ch["sched_start"] = start
-    st.ch["sched_end"] = end
+    st.ch["sched_slots"] = slots_list
+    
+    # Geriye dönük uyumluluk için ilk slot'u da eski alanlara yaz
+    if slots_list:
+        st.ch["sched_start"] = slots_list[0]["start"]
+        st.ch["sched_end"] = slots_list[0]["end"]
 
     try:
         channels_data = [s.ch for s in manager.streams.values()]
         with open(LOCAL_JSON_PATH, "w", encoding="utf-8") as f:
             json.dump(channels_data, f, indent=2, ensure_ascii=False)
-        log.info(f"Kanal zamanlayıcı ayarları kaydedildi: {cid}")
+        log.info(f"Kanal zamanlayıcı ayarları kaydedildi: {cid} ({len(slots_list)} slot)")
     except Exception as e:
         log.error(f"Zamanlayıcı ayarları kaydedilemedi: {e}")
 
@@ -1108,7 +1201,7 @@ async def handle_admin_update_schedule(request):
         elif not sched_state and st.is_alive():
             await st.stop()
 
-    return web.json_response({"success": True, "id": cid}, headers=NO_CACHE_HEADERS)
+    return web.json_response({"success": True, "id": cid, "slots_count": len(slots_list)}, headers=NO_CACHE_HEADERS)
 
 
 # ==================== APP STARTUP & CLEANUP ====================
