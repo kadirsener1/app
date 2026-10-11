@@ -569,6 +569,8 @@ async def handle_standby_segment(request):
 
 
 async def handle_health(request):
+    key = request.query.get("key")
+    is_admin = (key == ADMIN_KEY)
     status = {
         "server": {
             "uptime_seconds": int(time.time() - APP_START_TIME),
@@ -585,7 +587,7 @@ async def handle_health(request):
     for cid, st in manager.streams.items():
         status["channels"][cid] = {
             "name": st.ch.get("name", cid), 
-            "url": st.src,
+            "url": st.src if is_admin else "YAYIN LINKI GIZLENMISTIR",
             "enabled": st.enabled,
             "running": st.is_alive(),
             "ready": st.playlist_ready(),
@@ -759,7 +761,8 @@ ADMIN_HTML = """
 
         async function loadStatus() {
             try {
-                const res = await fetch(`/health?_=${Date.now()}`, { cache: 'no-store' });
+                const key = getStoredKey();
+                const res = await fetch(`/health?key=${encodeURIComponent(key)}&_=${Date.now()}`, { cache: 'no-store' });
                 if (!res.ok) return;
                 const data = await res.json();
                 
@@ -785,8 +788,7 @@ ADMIN_HTML = """
                     }
 
                     const inputId = `url_${id}`;
-                    const activeElement = document.activeElement;
-                    const isInputFocused = (activeElement && (activeElement.id === inputId || activeElement.classList.contains(`sched-input-${id}`)));
+                    const hasFocusWithinCard = card.contains(document.activeElement);
 
                     if (!card.querySelector('.edit-input')) {
                         card.innerHTML = `
@@ -877,7 +879,7 @@ ADMIN_HTML = """
                         btnToggle.innerText = info.enabled ? 'YAYINI KAPAT' : 'YAYINI AÇ';
                         btnToggle.setAttribute('onclick', `toggleChannel('${id}', ${!info.enabled})`);
 
-                        if (!isInputFocused) {
+                        if (!hasFocusWithinCard) {
                             const inp = card.querySelector('.edit-input');
                             if (inp.value !== info.url) {
                                 inp.value = info.url;
