@@ -788,7 +788,6 @@ ADMIN_HTML = """
                     }
 
                     const inputId = `url_${id}`;
-                    const hasFocusWithinCard = card.contains(document.activeElement);
 
                     if (!card.querySelector('.edit-input')) {
                         card.innerHTML = `
@@ -878,22 +877,6 @@ ADMIN_HTML = """
                         btnToggle.className = `btn btn-toggle-action ${info.enabled ? 'btn-off' : 'btn-on'}`;
                         btnToggle.innerText = info.enabled ? 'YAYINI KAPAT' : 'YAYINI AÇ';
                         btnToggle.setAttribute('onclick', `toggleChannel('${id}', ${!info.enabled})`);
-
-                        if (!hasFocusWithinCard) {
-                            const inp = card.querySelector('.edit-input');
-                            if (inp.value !== info.url) {
-                                inp.value = info.url;
-                            }
-                            
-                            document.getElementById(`sched_enable_${id}`).checked = info.sched_enabled;
-                            document.getElementById(`sched_start_${id}`).value = info.sched_start;
-                            document.getElementById(`sched_end_${id}`).value = info.sched_end;
-                            
-                            card.querySelectorAll(`.sched-day-${id}`).forEach(cb => {
-                                cb.checked = info.sched_days.includes(parseInt(cb.value));
-                            });
-                            toggleScheduleUI(id);
-                        }
                     }
                 }
             } catch(e) {}
