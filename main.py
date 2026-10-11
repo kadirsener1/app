@@ -294,6 +294,10 @@ def check_schedule(st) -> bool | None:
     now = datetime.datetime.now()
     day_of_week = now.weekday()
     sched_days = st.ch.get("sched_days", [])
+    try:
+        sched_days = [int(d) for d in sched_days]
+    except Exception:
+        sched_days = []
 
     if day_of_week not in sched_days:
         return False
@@ -475,11 +479,13 @@ class StreamManager:
                 if sched_state is not None:
                     if sched_state and not st.enabled:
                         st.enabled = True
+                        st.ch["enabled"] = True
                         st.touch()
                         await st.start()
                         log.info(f"[Zamanlayıcı] {cid} yayını otomatik olarak BAŞLATILDI.")
                     elif not sched_state and st.enabled:
                         st.enabled = False
+                        st.ch["enabled"] = False
                         await st.stop()
                         log.info(f"[Zamanlayıcı] {cid} yayını otomatik olarak DURDURULDU.")
 
@@ -930,6 +936,21 @@ ADMIN_HTML = """
                         btnToggle.className = `btn btn-toggle-action ${info.enabled ? 'btn-off' : 'btn-on'}`;
                         btnToggle.innerText = info.enabled ? 'YAYINI KAPAT' : 'YAYINI AÇ';
                         btnToggle.setAttribute('onclick', `toggleChannel('${id}', ${!info.enabled})`);
+
+                        // Form odaklanmışken verilerin sıfırlanmasını engelleyen senkronizasyon düzeltmesi
+                        const schedCheckbox = document.getElementById(`sched_enable_${id}`);
+                        if (schedCheckbox) {
+                            const isFocused = document.activeElement && (
+                                document.activeElement.id === `sched_enable_${id}` || 
+                                document.activeElement.classList.contains(`sched-input-${id}`) || 
+                                document.activeElement.classList.contains(`sched-slot-start-${id}`) || 
+                                document.activeElement.classList.contains(`sched-slot-end-${id}`)
+                            );
+                            if (!isFocused) {
+                                schedCheckbox.checked = info.sched_enabled;
+                                toggleScheduleUI(id);
+                            }
+                        }
                     }
                 }
             } catch(e) {}
@@ -1076,6 +1097,9 @@ async def handle_admin_toggle(request):
 
     st.enabled = enable
     st.ch["enabled"] = enable
+
+    # Kullanıcı manuel müdahale yaptığında, zamanlayıcının yayını hemen geri kapatmasını önlemek için zamanlayıcıyı devreden çıkarıyoruz
+    st.ch["sched_enabled"] = False
 
     try:
         channels_data = [s.ch for s in manager.streams.values()]
