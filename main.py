@@ -291,7 +291,7 @@ def check_schedule(st) -> bool | None:
     if not st.ch.get("sched_enabled", False):
         return None
 
-     tr_tz = datetime.timezone(datetime.timedelta(hours=3))
+    tr_tz = datetime.timezone(datetime.timedelta(hours=3))
     now = datetime.datetime.now(tr_tz)
     day_of_week = now.weekday()
     sched_days = st.ch.get("sched_days", [])
