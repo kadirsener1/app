@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+bu kadda admin şifre gözükmesin yayın url si gibi olsun asla ama asla başka birşeye karışma #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 FFmpeg tabanlı HLS re-stream proxy (Canlı İzleyici Sayacı & Kalıcı Aylık Kota Takibi).
