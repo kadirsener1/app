@@ -32,8 +32,8 @@ STATE_FILE      = os.environ.get("STATE_FILE", str(BASE_DIR / "server_state.json
 HLS_BASE_DIR = "/tmp/iptv_hls"
 STANDBY_TS_PATH = os.path.join(HLS_BASE_DIR, "standby.ts")
 
-HLS_TIME       = 4
-HLS_LIST_SIZE  = 12
+HLS_TIME       = 2
+HLS_LIST_SIZE  = 20
 IDLE_TIMEOUT   = 100
 STARTUP_WAIT   = 60
 FFMPEG_BIN     = "ffmpeg"
@@ -365,7 +365,7 @@ class ChannelStream:
             "-reconnect_delay_max", "5", "-user_agent", "VLC/3.0.18 LibVLC/3.0.18",
             "-i", self.src, "-c", "copy", "-f", "hls",
             "-hls_time", str(HLS_TIME), "-hls_list_size", str(HLS_LIST_SIZE),
-            "-hls_flags", "delete_segments+append_list+omit_endlist+independent_segments",
+            "-hls_flags", "delete_segments+append_list+omit_endlist+independent_segments+temp_file",
             "-hls_segment_type", "mpegts", "-hls_segment_filename", seg_pattern,
             "-hls_allow_cache", "1", m3u8_path
         ]
