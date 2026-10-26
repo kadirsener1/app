@@ -167,6 +167,13 @@ DEFAULT_KANALLAR = [
         "group": "Spor",
         "logo": "https://raw.githubusercontent.com/kadirsener1/tvmyeni/refs/heads/main/bg.JPG",
         "url": os.environ.get("URL_FUTBOL_TV", "http://varsayilan-yayin-adresi.m3u8")
+    },
+    {
+        "id": "rus",
+        "name": "RUS TV",
+        "group": "Spor",
+        "logo": "https://raw.githubusercontent.com/kadirsener1/tvmyeni/refs/heads/main/bg.JPG",
+        "url": os.environ.get("URL_RUS", "http://varsayilan-yayin-adresi.m3u8")
     }
 ]
 
